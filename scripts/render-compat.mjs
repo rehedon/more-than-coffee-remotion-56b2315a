@@ -1,13 +1,18 @@
 import {execFile} from 'node:child_process'
-import {mkdir, mkdtemp, readdir, rm} from 'node:fs/promises'
+import {mkdir, mkdtemp, readdir, rename, rm} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join, resolve} from 'node:path'
 import {promisify} from 'node:util'
 import {bundle} from '@remotion/bundler'
-import {openBrowser, renderFrames, selectComposition, stitchFramesToVideo} from '@remotion/renderer'
+import {openBrowser, renderFrames, selectComposition} from '@remotion/renderer'
 
 const run = promisify(execFile)
 const output = resolve('out/MoreThanCoffee.mp4')
+const ffmpeg = process.env.FFMPEG_PATH || 'ffmpeg'
+await run(ffmpeg, ['-version']).catch((error) => {
+  if (error.code === 'ENOENT') throw new Error('The compatibility renderer needs FFmpeg in PATH or FFMPEG_PATH.')
+  throw error
+})
 await run('pdftoppm', ['-v']).catch((error) => {
   if (error.code === 'ENOENT') {
     throw new Error('The compatibility renderer needs pdftoppm from Poppler in PATH.')
@@ -16,9 +21,10 @@ await run('pdftoppm', ['-v']).catch((error) => {
 })
 await mkdir('out', {recursive: true})
 const scratch = await mkdtemp(join(tmpdir(), 'more-than-coffee-'))
-const browser = await openBrowser('chrome', {logLevel: 'warn'})
+let browser
 
 try {
+  browser = await openBrowser('chrome', {logLevel: 'warn'})
   // On hosts where Chromium's compositor clock stalls, let the JavaScript frame queue finish.
   const newPage = browser.newPage.bind(browser)
   browser.newPage = async (options) => {
@@ -55,7 +61,7 @@ try {
   const {width, height, fps} = composition
   const {assetsInfo} = await renderFrames({
     serveUrl, composition, puppeteerInstance, outputDir: scratch, imageFormat: 'pdf',
-    concurrency: 4, logLevel: 'warn',
+    muted: true, concurrency: 4, logLevel: 'warn',
     onStart: ({frameCount}) => console.log(`Rendering ${frameCount} frames`),
     onFrameUpdate: (count) => {
       if (count % 90 === 0 || count === composition.durationInFrames) console.log(`Rendered ${count} frames`)
@@ -73,12 +79,17 @@ try {
     }))
   }
 
-  await stitchFramesToVideo({
-    assetsInfo: {...assetsInfo, imageSequenceName: assetsInfo.imageSequenceName.replace(/\.pdf$/, '.jpg')},
-    codec: 'h264', crf: 17, fps, width, height, outputLocation: output, force: true,
-  })
+  const movie = join(scratch, 'MoreThanCoffee.mp4')
+  await run(ffmpeg, [
+    '-loglevel', 'error', '-framerate', String(fps), '-start_number', String(assetsInfo.firstFrameIndex),
+    '-i', assetsInfo.imageSequenceName.replace(/\.pdf$/, '.jpg'), '-i', resolve('public/score.wav'),
+    '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'libx264', '-crf', '17', '-vf', 'setsar=1',
+    '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-movflags', '+faststart',
+    '-t', String(composition.durationInFrames / fps), movie,
+  ])
+  await rename(movie, output)
   console.log(output)
 } finally {
-  await browser.close({silent: true})
+  await browser?.close({silent: true})
   await rm(scratch, {recursive: true, force: true})
 }

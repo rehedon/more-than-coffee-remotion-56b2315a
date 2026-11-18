@@ -19,7 +19,7 @@ npm run typecheck
 npm run render
 ```
 
-若宿主机上的 Chromium 无法启动逐帧捕获，可安装 Poppler 并运行 `npm run render:compat`。兼容命令会逐帧导出画面，再合成相同规格的 MP4。
+若宿主机上的 Chromium 无法启动逐帧捕获，可安装 Poppler 和 FFmpeg 并运行 `npm run render:compat`。兼容命令会逐帧导出画面，再合成相同规格的 MP4。
 
 成片位于 `out/MoreThanCoffee.mp4`。音轨已随项目提供，也可以运行 `npm run audio:build` 从合成脚本重建。
 
