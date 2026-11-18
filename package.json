@@ -1,0 +1,27 @@
+{
+  "name": "more-than-coffee-remotion",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "remotion studio src/index.tsx",
+    "typecheck": "tsc --noEmit",
+    "render": "remotion render src/index.tsx MoreThanCoffee out/MoreThanCoffee.mp4 --codec=h264 --crf=17",
+    "audio:build": "node scripts/build-score.mjs",
+    "render:compat": "node scripts/render-compat.mjs"
+  },
+  "dependencies": {
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.534",
+    "@remotion/cli": "4.0.534",
+    "@remotion/renderer": "4.0.534",
+    "@types/react": "19.1.0",
+    "typescript": "5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
